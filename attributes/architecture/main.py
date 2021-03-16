@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import json
 
 import networkx
 from pygments import lexers, token, util
@@ -37,17 +38,18 @@ ACK_LANGUAGE_MAP = {
     'c#': 'csharp',
     'objective-c': 'objc',
     'ojective-c++': 'objcpp',
+    'javascript': 'js'
 }
 
 
 def init(cursor):
     global SUPPORTED_LANGUAGES
 
-    ack_process = subprocess.Popen(
+    ack_process2 = subprocess.Popen(
         ['ack', '--help-types'], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
 
-    lines, _ = [x.decode('utf-8') for x in ack_process.communicate()]
+    lines, _ = [x.decode('utf-8') for x in ack_process2.communicate()]
     for line in lines.split('\n'):
         match = RE_ACK_LANGUAGES.match(line)
         if match:
@@ -75,30 +77,62 @@ def run(project_id, repo_path, cursor, **options):
         ack_language = ACK_LANGUAGE_MAP[ack_language]
 
     # Edge case if the repository language is not supported by us.
-    if ack_language not in SUPPORTED_LANGUAGES:
+    if (ack_language not in SUPPORTED_LANGUAGES) and (language.lower() != 'javascript'):
         return False, result
 
-    ack_process = subprocess.Popen(
-        ['ack', '-f', "--{0}".format(ack_language), repo_path],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-
-    lines, _ = [
-        x.decode(errors='replace') for x in ack_process.communicate()
-    ]
-
-    file_paths = [line for line in lines.split('\n') if line.strip()]
-
+    file_paths = []
+    if language.lower() == 'javascript':
+        for root, dirs, files in os.walk(repo_path):
+            for _file in files:
+                if _file.endswith(".js"):
+                    file_paths.append(os.path.join(root, _file))
+    else:
+        ack_process = subprocess.Popen(
+            ['ack', '-f', "--{0}".format(ack_language), repo_path],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        lines, _ = [
+            x.decode(errors='replace') for x in ack_process.communicate()
+        ]
+        file_paths = [line for line in lines.split('\n') if line.strip()]
     # Immediately fail the attribute if `minimumFiles` is not met.
     if len(file_paths) < options.get('minimumFiles', 2):
         return False, result
 
     graph = networkx.Graph()
-    lexer = lexers.get_lexer_by_name(language)
-    build_graph(file_paths, graph, lexer)
-
+    if language.lower() == 'javascript':
+        # JavaScript: Use external utility
+        build_js_graph(repo_path, file_paths, graph)
+    else:
+        # Default: Use Pygments
+        lexer = lexers.get_lexer_by_name(language)
+        build_graph(file_paths, graph, lexer)
     result = get_connectedness(graph)
     return result >= options['threshold'], result
+
+
+def build_js_graph(repo_path, file_paths, graph):
+    # add nodes
+    for file_path in file_paths:
+        graph.add_node(Node(file_path))
+    name = repo_path.split('/')[-1]  # get name of the repository
+    # compute and store call graph as json using js-callgraph
+    graph_process = f"js-callgraph --cg {' '.join(file_paths)} --output {name}_graph.json >/dev/null 2>&1"
+    os.system(graph_process)
+    try:
+        with open('{}_graph.json'.format(name), 'r') as json_file:
+            # load the json representation of the call graph
+            calls = json.load(json_file)
+            for call in calls:
+                source_file = call['source']['file']  # identify the source of the call
+                target_file = call['target']['file']  # identify the target of the call
+                # both source and target should be nodes in the call graph, i.e., .js files
+                if source_file.endswith(".js") and target_file.endswith(".js"):
+                    graph.add_edge(Node(source_file), Node(target_file))  # add edge
+            graph.to_undirected()  # just in case, transform into undirected (should be undirected by default anyway)
+        os.remove('{}_graph.json'.format(name))  # delete the json representation of the call graph
+    except IOError as err:
+        print(err)
 
 
 def build_graph(file_paths, graph, lexer):
@@ -154,6 +188,9 @@ def build_graph(file_paths, graph, lexer):
 
 def get_connectedness(graph):
     components = list(networkx.connected_component_subgraphs(graph))
+    # N = networkx.nx_agraph.to_agraph(graph)
+    # N.layout(prog='dot')
+    # N.draw("file.png")
     components.sort(key=lambda i: len(i.nodes()), reverse=True)
     largest_component = components[0]
 
