@@ -10,21 +10,18 @@ class JavaScriptTestDiscovererTestCase(unittest.TestCase):
         self.discoverer = get_test_discoverer('JavaScript')
 
     @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
-    def test_discover(self):
+    def test_discover_mocha(self):
         # Test: Project using Mocha
         path = os.path.join(REPOS_PATH, 'superagent')
         proportion = self.discoverer.discover(path)
         self.assertLess(0, proportion)
 
-        # Test: Project with no unit tests (when these tests were written)
-        path = os.path.join(REPOS_PATH, 'javascript')
+    @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
+    def test_discover_qunit(self):
+        # Test: Project using QUnit
+        path = os.path.join(REPOS_PATH, 'jquery-mobile')
         proportion = self.discoverer.discover(path)
-        self.assertEqual(0, proportion)
-
-        # Test: Project in Ruby to simulate a project with no C source code
-        path = os.path.join(REPOS_PATH, 'squib')
-        proportion = self.discoverer.discover(path)
-        self.assertEqual(0, proportion)
+        self.assertLess(0, proportion)
 
     @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
     def test_mocha(self):
@@ -35,9 +32,29 @@ class JavaScriptTestDiscovererTestCase(unittest.TestCase):
         )
         self.assertLess(0, proportion)
 
+    @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
+    def test_no_mocha(self):
         # Test: Project not using Mocha
-        path = os.path.join(REPOS_PATH, 'qunit')
+        path = os.path.join(REPOS_PATH, 'jquery-mobile')
         proportion = self.discoverer.__mocha__(
+            path, get_lsloc(path, self.discoverer.languages)
+        )
+        self.assertEqual(0, proportion)
+
+    @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
+    def test_qunit(self):
+        # Test: Project using Mocha
+        path = os.path.join(REPOS_PATH, 'jquery-mobile')
+        proportion = self.discoverer.__qunit__(
+            path, get_lsloc(path, self.discoverer.languages)
+        )
+        self.assertLess(0, proportion)
+
+    @unittest.skipIf(not os.path.exists(REPOS_PATH), 'setup.sh not run.')
+    def test_no_qunit(self):
+        # Test: Project using Mocha
+        path = os.path.join(REPOS_PATH, 'superagent')
+        proportion = self.discoverer.__qunit__(
             path, get_lsloc(path, self.discoverer.languages)
         )
         self.assertEqual(0, proportion)

@@ -172,7 +172,7 @@ def search(
 
     files = None
 
-    command = 'grep -Plc'
+    command = 'ggrep -Plc'
     if recursive:
         command += ' -r'
     if whole:
