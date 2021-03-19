@@ -102,13 +102,15 @@ def run(project_id, repo_path, cursor, **options):
     graph = networkx.Graph()
     if language.lower() == 'javascript':
         # JavaScript: Use external utility
-        build_js_graph(repo_path, file_paths, graph)
+        success = build_js_graph(repo_path, file_paths, graph)
     else:
-        # Default: Use Pygments
         lexer = lexers.get_lexer_by_name(language)
-        build_graph(file_paths, graph, lexer)
-    result = get_connectedness(graph)
-    return result >= options['threshold'], result
+        success = build_graph(repo_path, graph, lexer)
+    if success:
+        monolithicity = get_connectedness(graph)
+    else:
+        monolithicity = 0
+    return monolithicity >= options['threshold'], monolithicity
 
 
 def build_js_graph(repo_path, file_paths, graph):
@@ -117,7 +119,7 @@ def build_js_graph(repo_path, file_paths, graph):
         graph.add_node(Node(file_path))
     name = repo_path.split('/')[-1]  # get name of the repository
     # compute and store call graph as json using js-callgraph
-    graph_process = f"js-callgraph --cg {' '.join(file_paths)} --output {name}_graph.json >/dev/null 2>&1"
+    graph_process = f"gtimeout 1000 js-callgraph --cg {repo_path} --output {name}_graph.json >/dev/null 2>&1"
     os.system(graph_process)
     try:
         with open('{}_graph.json'.format(name), 'r') as json_file:
@@ -131,8 +133,10 @@ def build_js_graph(repo_path, file_paths, graph):
                     graph.add_edge(Node(source_file), Node(target_file))  # add edge
             graph.to_undirected()  # just in case, transform into undirected (should be undirected by default anyway)
         os.remove('{}_graph.json'.format(name))  # delete the json representation of the call graph
+        return True
     except IOError as err:
         print(err)
+        return False
 
 
 def build_graph(file_paths, graph, lexer):
@@ -184,6 +188,7 @@ def build_graph(file_paths, graph, lexer):
             for callee in graph.nodes_iter():
                 if callee is not caller and reference in callee.defines:
                     graph.add_edge(caller, callee)
+    return True
 
 
 def get_connectedness(graph):
