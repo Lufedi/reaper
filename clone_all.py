@@ -28,6 +28,8 @@ def clone(owner, name, directory, date=None):
     """
 
     path = os.path.join(directory, owner)
+    if not os.path.exists(DIR_CLONED):
+        os.makedirs(DIR_CLONED, exist_ok=True)
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
     url = 'https://github.com/{0}/{1}'.format(owner, name)

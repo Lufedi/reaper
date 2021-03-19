@@ -26,3 +26,21 @@ ISSUES = os.path.join(DIR_DATA, 'issues.csv')
 LICENSES = os.path.join(DIR_DATA, 'licenses.csv')
 # path to store the results of the feature computation
 RESULTS = os.path.join(DIR_DATA, 'results.csv')
+
+RESULT = os.path.join(DIR_DATA, 'result.csv')
+
+RESULT_REPO = os.path.join(DIR_DATA, 'result_repo.csv')
+
+RESULT_A = os.path.join(DIR_DATA, 'result_a.csv')
+
+RESULT_A2 = os.path.join(DIR_DATA, 'result_a2.csv')
+
+RESULT_A3 = os.path.join(DIR_DATA, 'result_a3.csv')
+
+RESULT2 = os.path.join(DIR_DATA, 'result2.csv')
+
+RESULT3 = os.path.join(DIR_DATA, 'result.csv')
+
+RESULT4 = os.path.join(DIR_DATA, 'result2.csv')
+
+RESULT5 = os.path.join(DIR_DATA, 'result3.csv')
